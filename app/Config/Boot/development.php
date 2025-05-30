@@ -2,20 +2,35 @@
 
 /*
  |--------------------------------------------------------------------------
- | ERROR DISPLAY
+ | DEBUG MODE
  |--------------------------------------------------------------------------
- | In development, we want to show as many errors as possible to help
- | make sure they don't make it to production. And save us hours of
- | painful debugging.
- |
- | If you set 'display_errors' to '1', CI4's detailed error report will show.
+ | Debug mode is an experimental flag that can allow for displaying of
+ | additional debug toolbars and information during development.
+ | This is not used in production.
+ | It can be set to 'true' or 'false'.
  */
-error_reporting(E_ALL);
-ini_set('display_errors', '1');
+defined('CI_DEBUG') || define('CI_DEBUG', true);
 
 /*
  |--------------------------------------------------------------------------
- | DEBUG BACKTRACES
+ | ERROR REPORTING
+ |--------------------------------------------------------------------------
+ | Different environments will require different levels of error reporting.
+ | By default development will show errors but testing and live will hide them.
+ */
+
+// Show all errors in development
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+ini_set('log_errors', 1);
+
+// Configurar logging
+ini_set('error_log', WRITEPATH . 'logs/php_errors.log');
+
+/*
+ |--------------------------------------------------------------------------
+ | DEBUG BACKTRACE
  |--------------------------------------------------------------------------
  | If true, this constant will tell the error screens to display debug
  | backtraces along with the other error information. If you would
@@ -25,10 +40,14 @@ defined('SHOW_DEBUG_BACKTRACE') || define('SHOW_DEBUG_BACKTRACE', true);
 
 /*
  |--------------------------------------------------------------------------
- | DEBUG MODE
+ | ENVIRONMENT
  |--------------------------------------------------------------------------
- | Debug mode is an experimental flag that can allow changes throughout
- | the system. This will control whether Kint is loaded, and a few other
- | items. It can always be used within your own application too.
+ | You can load different configurations depending on your
+ | current environment. Setting the environment also influences
+ | things like logging and error reporting.
+ | This can be set to anything, but default usage is:
+ *     development
+ *     testing
+ *     production
  */
-defined('CI_DEBUG') || define('CI_DEBUG', true);
+defined('ENVIRONMENT') || define('ENVIRONMENT', 'development');
