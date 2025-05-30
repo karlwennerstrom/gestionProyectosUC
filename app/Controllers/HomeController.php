@@ -77,42 +77,33 @@ class HomeController extends BaseController
      * Dashboard para usuarios normales
      */
     protected function userDashboard()
-    {
-        $session = session();
-        
-        // Obtener datos básicos del usuario desde sesión
-        $userData = [
-            'id' => $session->get('user_id'),
-            'email' => $session->get('user_email'),
-            'full_name' => $session->get('user_name'),
-            'user_type' => $session->get('user_type')
-        ];
-        
-        $data = [
-            'title' => 'Dashboard - Sistema Multi-Área UC',
-            'user' => $userData,
-            'stats' => $this->getUserStats($userData['id'] ?? 0),
-            'recent_projects' => [],
-            'pending_notifications' => []
-        ];
+{
+    $session = session();
+    
+    $userData = [
+        'id' => $session->get('user_id'),
+        'email' => $session->get('user_email'),
+        'full_name' => $session->get('user_name'),
+        'user_type' => $session->get('user_type')
+    ];
+    
+    $data = [
+        'title' => 'Dashboard Usuario - Sistema Multi-Área UC',
+        'navbar_type' => 'dashboard',
+        'user' => $userData,
+        'stats' => $this->getUserStats($userData['id'] ?? 0),
+        'recent_projects' => $this->getRecentProjects($userData['id'] ?? 0),
+        'pending_notifications' => $this->getPendingNotifications($userData['id'] ?? 0),
+        'notification_count' => $this->getNotificationCount($userData['id'] ?? 0)
+    ];
 
-        return view('dashboard/user', $data);
-    }
+    return view('dashboard/user', $data);
+}
 
     /**
      * Obtener estadísticas del usuario
      */
-    private function getUserStats(int $userId): array
-    {
-        // Por ahora devolver datos estáticos
-        return [
-            'total_projects' => 0,
-            'active_projects' => 0,
-            'completed_projects' => 0,
-            'pending_projects' => 0
-        ];
-    }
-
+   
     /**
      * Página de información del sistema
      */
@@ -278,63 +269,202 @@ class HomeController extends BaseController
      * Dashboard para Super Administradores (temporal)
      */
     public function superAdminDashboard()
-    {
-        $session = session();
-        
-        if (!$session->has('user_authenticated') || $session->get('user_type') !== 'super_admin') {
-            return redirect()->to('/auth/login');
-        }
-
-        $userData = [
-            'id' => $session->get('user_id'),
-            'email' => $session->get('user_email'),
-            'full_name' => $session->get('user_name'),
-            'user_type' => $session->get('user_type')
-        ];
-
-        $data = [
-            'title' => 'Dashboard Super Administrador - Sistema Multi-Área UC',
-            'user' => $userData,
-            'stats' => [
-                'total_users' => $this->userModel->countAll(),
-                'total_admins' => $this->userModel->where('user_type', 'admin')->countAllResults(),
-                'total_projects' => 0, // Temporal
-                'system_health' => 'operational'
-            ]
-        ];
-
-        return view('dashboard/super_admin', $data);
+{
+    $session = session();
+    
+    if (!$session->has('user_authenticated') || $session->get('user_type') !== 'super_admin') {
+        return redirect()->to('/auth/login');
     }
+
+    $userData = [
+        'id' => $session->get('user_id'),
+        'email' => $session->get('user_email'),
+        'full_name' => $session->get('user_name'),
+        'user_type' => $session->get('user_type')
+    ];
+
+    $data = [
+        'title' => 'Dashboard Super Admin - Sistema Multi-Área UC',
+        'navbar_type' => 'super_admin',
+        'user' => $userData,
+        'stats' => $this->getSuperAdminStats(),
+        'recent_activity' => $this->getRecentSystemActivity(),
+        'system_health' => $this->getSystemHealth()
+    ];
+
+    return view('dashboard/super_admin', $data);
+}
 
     /**
      * Dashboard para Administradores de Área (temporal)
      */
-    public function adminDashboard()
-    {
-        $session = session();
-        
-        if (!$session->has('user_authenticated') || !in_array($session->get('user_type'), ['admin', 'super_admin'])) {
-            return redirect()->to('/auth/login');
-        }
-
-        $userData = [
-            'id' => $session->get('user_id'),
-            'email' => $session->get('user_email'),
-            'full_name' => $session->get('user_name'),
-            'user_type' => $session->get('user_type')
-        ];
-
-        $data = [
-            'title' => 'Dashboard Administrador - Sistema Multi-Área UC',
-            'user' => $userData,
-            'stats' => [
-                'pending_reviews' => 0, // Temporal
-                'approved_projects' => 0, // Temporal
-                'rejected_projects' => 0, // Temporal
-                'area_workload' => 'normal'
-            ]
-        ];
-
-        return view('dashboard/admin', $data);
+   public function adminDashboard()
+{
+    $session = session();
+    
+    if (!$session->has('user_authenticated') || !in_array($session->get('user_type'), ['admin', 'super_admin'])) {
+        return redirect()->to('/auth/login');
     }
+
+    $userData = [
+        'id' => $session->get('user_id'),
+        'email' => $session->get('user_email'),
+        'full_name' => $session->get('user_name'),
+        'user_type' => $session->get('user_type')
+    ];
+
+    // Obtener áreas asignadas al administrador
+    $userModel = new \App\Models\UserModel();
+    $userWithAreas = $userModel->getUserWithAreas($userData['id']);
+    $userData['assigned_areas'] = $userWithAreas['assigned_areas'] ?? [];
+
+    $data = [
+        'title' => 'Dashboard Administrador - Sistema Multi-Área UC',
+        'navbar_type' => 'admin',
+        'user' => $userData,
+        'stats' => $this->getAdminStats($userData['id']),
+        'pending_projects' => $this->getPendingProjectsForAdmin($userData['id']),
+        'overdue_projects' => $this->getOverdueProjectsForAdmin($userData['id'])
+    ];
+
+    return view('dashboard/admin', $data);
+}
+private function getUserStats(int $userId): array
+{
+    // Obtener estadísticas del usuario
+    $projectModel = new \App\Models\ProjectModel();
+    
+    return [
+        'total_projects' => $projectModel->where('requester_id', $userId)->countAllResults(),
+        'active_projects' => $projectModel->where('requester_id', $userId)
+                                         ->whereIn('status', ['submitted', 'in_progress'])
+                                         ->countAllResults(),
+        'completed_projects' => $projectModel->where('requester_id', $userId)
+                                            ->where('status', 'completed')
+                                            ->countAllResults(),
+        'pending_projects' => $projectModel->where('requester_id', $userId)
+                                          ->where('status', 'submitted')
+                                          ->countAllResults()
+    ];
+}
+
+private function getRecentProjects(int $userId, int $limit = 5): array
+{
+    $projectModel = new \App\Models\ProjectModel();
+    return $projectModel->getProjectsByRequester($userId);
+}
+
+private function getPendingNotifications(int $userId, int $limit = 5): array
+{
+    $notificationModel = new \App\Models\NotificationModel();
+    return $notificationModel->getUserNotifications($userId, false, $limit);
+}
+
+private function getNotificationCount(int $userId): int
+{
+    $notificationModel = new \App\Models\NotificationModel();
+    return $notificationModel->getUnreadCount($userId);
+}
+
+private function getAdminStats(int $userId): array
+{
+    $areaAdminModel = new \App\Models\AreaAdminModel();
+    $userAreas = $areaAdminModel->getUserAreas($userId);
+    
+    $stats = [
+        'pending_reviews' => 0,
+        'approved_projects' => 0,
+        'rejected_projects' => 0,
+        'overdue_projects' => 0,
+        'monthly_approved' => 0,
+        'monthly_rejected' => 0
+    ];
+
+    foreach ($userAreas as $area) {
+        $phaseModel = new \App\Models\ProjectPhaseModel();
+        $areaStats = $phaseModel->getPhaseStats($area['area_id']);
+        
+        $stats['pending_reviews'] += $areaStats['pending'] + $areaStats['assigned'];
+        $stats['approved_projects'] += $areaStats['completed'];
+        $stats['rejected_projects'] += $areaStats['rejected'];
+    }
+
+    return $stats;
+}
+
+private function getPendingProjectsForAdmin(int $userId): array
+{
+    $areaAdminModel = new \App\Models\AreaAdminModel();
+    $userAreas = $areaAdminModel->getUserAreas($userId);
+    
+    $projects = [];
+    foreach ($userAreas as $area) {
+        $projectModel = new \App\Models\ProjectModel();
+        $areaProjects = $projectModel->getProjectsByArea($area['area_id']);
+        $projects = array_merge($projects, $areaProjects);
+    }
+    
+    return $projects;
+}
+
+private function getSuperAdminStats(): array
+{
+    $userModel = new \App\Models\UserModel();
+    $projectModel = new \App\Models\ProjectModel();
+    $areaModel = new \App\Models\AreaModel();
+    
+    return [
+        'total_users' => $userModel->countAll(),
+        'total_admins' => $userModel->where('user_type', 'admin')->countAllResults(),
+        'total_projects' => $projectModel->countAll(),
+        'active_areas' => $areaModel->where('is_active', 1)->countAllResults(),
+        'new_users_today' => $userModel->where('created_at >=', date('Y-m-d'))->countAllResults(),
+        'completed_today' => $projectModel->where('actual_completion >=', date('Y-m-d'))->countAllResults(),
+        'storage_usage' => $this->getStorageUsage(),
+        'pending_approvals' => 0, // Implementar según necesidades
+        'failed_jobs' => 0        // Implementar según necesidades
+    ];
+}
+
+private function getRecentSystemActivity(): array
+{
+    $auditModel = new \App\Models\AuditLogModel();
+    return $auditModel->searchLogs([
+        'limit' => 20,
+        'order_by' => 'created_at',
+        'order_dir' => 'DESC'
+    ]);
+}
+
+private function getSystemHealth(): array
+{
+    return [
+        'status' => 'healthy',
+        'uptime' => '99.9%',
+        'last_check' => date('Y-m-d H:i:s')
+    ];
+}
+
+private function getStorageUsage(): float
+{
+    // Calcular uso de almacenamiento
+    $uploadPath = FCPATH . 'uploads/';
+    if (is_dir($uploadPath)) {
+        $size = $this->getDirSize($uploadPath);
+        $maxSize = 10 * 1024 * 1024 * 1024; // 10GB límite ejemplo
+        return ($size / $maxSize) * 100;
+    }
+    return 0;
+}
+
+private function getDirSize($directory): int
+{
+    $size = 0;
+    if (is_dir($directory)) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)) as $file) {
+            $size += $file->getSize();
+        }
+    }
+    return $size;
+}
 }
