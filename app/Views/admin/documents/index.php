@@ -1,604 +1,556 @@
 <?php
-// app/Views/admin/projects/review.php
+// app/Views/admin/documents/index.php
 $this->extend('layouts/main');
 $this->section('content');
 ?>
 
 <div class="container">
     <!-- Header -->
-    <section class="mb-2xl">
-        <div class="flex items-center justify-between mb-lg">
-            <div>
-                <h1 class="text-4xl font-bold text-gray-800 mb-sm">
-                    👁️ Revisar Proyecto: <?= esc($project['code']) ?>
-                </h1>
-                <p class="text-gray-500">Revisión detallada y decisión sobre el proyecto</p>
-            </div>
-            <div class="flex items-center gap-md">
-                <a href="/admin/projects/pending" class="btn btn-secondary">
-                    ← Volver a Pendientes
-                </a>
-                <button onclick="App.openModal('quick-decision-modal')" class="btn btn-primary">
-                    ⚡ Decisión Rápida
-                </button>
-            </div>
+    <section class="flex items-center justify-between mb-2xl">
+        <div>
+            <h1 class="text-4xl font-bold text-gray-800 mb-sm">📎 Gestión de Documentos</h1>
+            <p class="text-gray-500">Revisar y aprobar documentos de proyectos</p>
         </div>
-        
-        <!-- Project Status Bar -->
-        <div class="card bg-blue-50 border border-blue-200">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-lg">
-                    <div class="text-2xl">📋</div>
-                    <div>
-                        <h2 class="text-xl font-semibold text-blue-800">
-                            <?= esc($project['title']) ?>
-                        </h2>
-                        <p class="text-blue-600">
-                            Solicitado por: <?= esc($project['requester_name']) ?> • 
-                            Creado: <?= date('d/m/Y H:i', strtotime($project['created_at'])) ?>
-                        </p>
-                    </div>
+        <div class="flex items-center gap-md">
+            <button onclick="App.openModal('document-filters-modal')" class="btn btn-secondary">
+                🔍 Filtros Avanzados
+            </button>
+            <a href="/admin/dashboard" class="btn btn-outline">
+                ← Volver al Dashboard
+            </a>
+        </div>
+    </section>
+
+    <!-- Stats Cards -->
+    <section class="grid grid-cols-4 gap-lg mb-2xl">
+        <div class="stat-card" style="border-left: 4px solid #f59e0b;">
+            <div class="stat-icon">📋</div>
+            <div class="stat-number">12</div>
+            <div class="stat-label">Pendientes de Revisión</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #10b981;">
+            <div class="stat-icon">✅</div>
+            <div class="stat-number">85</div>
+            <div class="stat-label">Aprobados</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #ef4444;">
+            <div class="stat-icon">❌</div>
+            <div class="stat-number">8</div>
+            <div class="stat-label">Rechazados</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #3b82f6;">
+            <div class="stat-icon">📊</div>
+            <div class="stat-number">2.3 GB</div>
+            <div class="stat-label">Almacenamiento</div>
+        </div>
+    </section>
+
+    <!-- Quick Filters -->
+    <section class="card mb-xl">
+        <div class="flex items-center justify-between gap-lg">
+            <div class="flex items-center gap-md">
+                <div class="form-group mb-0">
+                    <input type="text" id="search-documents" class="form-input" 
+                           placeholder="Buscar documentos o proyectos..." 
+                           style="min-width: 300px;">
                 </div>
-                <div class="text-right">
-                    <span class="inline-block px-md py-sm rounded-lg text-sm font-medium bg-blue-100 text-blue-700">
-                        Estado: <?= ucfirst($project['status']) ?>
-                    </span>
+                <div class="form-group mb-0">
+                    <select id="filter-status" class="form-select">
+                        <option value="">Todos los estados</option>
+                        <option value="pending">Pendientes</option>
+                        <option value="approved">Aprobados</option>
+                        <option value="rejected">Rechazados</option>
+                    </select>
                 </div>
+                <div class="form-group mb-0">
+                    <select id="filter-type" class="form-select">
+                        <option value="">Todos los tipos</option>
+                        <option value="ficha_formalizacion">Ficha de Formalización</option>
+                        <option value="especificacion_tecnica">Especificación Técnica</option>
+                        <option value="diagrama_arquitectura">Diagrama de Arquitectura</option>
+                        <option value="manual_usuario">Manual de Usuario</option>
+                        <option value="plan_pruebas">Plan de Pruebas</option>
+                        <option value="certificado_seguridad">Certificado de Seguridad</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex items-center gap-sm">
+                <button onclick="toggleView()" class="btn btn-secondary" id="view-toggle">
+                    📊 Vista Lista
+                </button>
+                <button onclick="exportDocuments()" class="btn btn-secondary">
+                    📥 Exportar
+                </button>
             </div>
         </div>
     </section>
 
-    <div class="grid grid-cols-3 gap-xl">
-        <!-- Main Content - 2 columns -->
-        <div class="col-span-2 space-y-xl">
+    <!-- Documents Grid/List -->
+    <section id="documents-container">
+        <div id="grid-view" class="grid grid-cols-1 gap-lg">
             
-            <!-- Project Details -->
-            <section class="card">
-                <h3 class="card-title">📋 Detalles del Proyecto</h3>
-                
-                <div class="space-y-lg">
-                    <div>
-                        <label class="font-semibold text-gray-700 block mb-sm">Descripción:</label>
-                        <p class="text-gray-600 leading-relaxed">
-                            <?= esc($project['description']) ?>
-                        </p>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-lg">
-                        <div>
-                            <label class="font-semibold text-gray-700 block mb-sm">Departamento:</label>
-                            <p class="text-gray-600"><?= esc($project['department'] ?? 'No especificado') ?></p>
-                        </div>
-                        <div>
-                            <label class="font-semibold text-gray-700 block mb-sm">Prioridad:</label>
-                            <span class="priority-badge priority-<?= $project['priority'] ?? 'medium' ?>">
-                                <?= ucfirst($project['priority'] ?? 'medium') ?>
-                            </span>
+            <!-- Document Card 1 -->
+            <div class="card document-card" data-status="pending" data-type="ficha_formalizacion">
+                <div class="flex items-start gap-lg">
+                    <!-- Document Preview -->
+                    <div class="flex-shrink-0">
+                        <div class="w-16 h-20 bg-red-100 rounded-lg flex items-center justify-center text-2xl">
+                            📋
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-2 gap-lg">
-                        <div>
-                            <label class="font-semibold text-gray-700 block mb-sm">Email de Contacto:</label>
-                            <p class="text-gray-600">
-                                <a href="mailto:<?= esc($project['contact_email'] ?? '') ?>" 
-                                   class="text-primary hover:underline">
-                                    <?= esc($project['contact_email'] ?? 'No especificado') ?>
-                                </a>
-                            </p>
+                    <!-- Document Info -->
+                    <div class="flex-1">
+                        <div class="flex items-start justify-between mb-sm">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 mb-xs">
+                                    Ficha_Formalizacion_v2.pdf
+                                </h3>
+                                <p class="text-primary font-medium">PROJ-2025-001 - Sistema de Gestión Académica</p>
+                            </div>
+                            <span class="status-badge status-pending">Pendiente</span>
                         </div>
-                        <div>
-                            <label class="font-semibold text-gray-700 block mb-sm">Teléfono:</label>
-                            <p class="text-gray-600"><?= esc($project['contact_phone'] ?? 'No especificado') ?></p>
+                        
+                        <div class="grid grid-cols-4 gap-lg text-sm text-gray-600 mb-md">
+                            <div>
+                                <span class="font-medium">Tipo:</span><br>
+                                Ficha de Formalización
+                            </div>
+                            <div>
+                                <span class="font-medium">Subido por:</span><br>
+                                Juan Pérez
+                            </div>
+                            <div>
+                                <span class="font-medium">Fecha:</span><br>
+                                <?= date('d/m/Y H:i', strtotime('-2 hours')) ?>
+                            </div>
+                            <div>
+                                <span class="font-medium">Tamaño:</span><br>
+                                2.4 MB
+                            </div>
+                        </div>
+                        
+                        <!-- Progress Bar -->
+                        <div class="mb-md">
+                            <div class="flex justify-between text-xs mb-xs">
+                                <span class="text-gray-600">Estado de Revisión</span>
+                                <span class="font-semibold">25%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 25%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-sm">
+                                <button onclick="previewDocument(1)" class="btn btn-sm btn-secondary">
+                                    👁️ Vista Previa
+                                </button>
+                                <button onclick="downloadDocument(1)" class="btn btn-sm btn-outline">
+                                    📥 Descargar
+                                </button>
+                                <button onclick="shareDocument(1)" class="btn btn-sm btn-outline">
+                                    📤 Compartir
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-xs">
+                                <button onclick="approveDocument(1)" class="btn btn-sm btn-success">
+                                    ✅ Aprobar
+                                </button>
+                                <button onclick="rejectDocument(1)" class="btn btn-sm btn-error">
+                                    ❌ Rechazar
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    
-                    <?php if (!empty($project['budget'])): ?>
-                    <div>
-                        <label class="font-semibold text-gray-700 block mb-sm">Presupuesto Estimado:</label>
-                        <p class="text-gray-600 text-lg font-medium">
-                            $<?= number_format($project['budget'], 0, ',', '.') ?> CLP
-                        </p>
-                    </div>
-                    <?php endif; ?>
                 </div>
-            </section>
+            </div>
             
-            <!-- Project Phases -->
-            <section class="card">
-                <h3 class="card-title">🔄 Fases del Proyecto</h3>
-                
-                <div class="space-y-md">
-                    <?php 
-                    $phases = $project['phases'] ?? [
-                        ['area_name' => 'Formalización', 'status' => 'completed', 'area_color' => '#3B82F6'],
-                        ['area_name' => 'Arquitectura', 'status' => 'in_progress', 'area_color' => '#10B981'],
-                        ['area_name' => 'Infraestructura', 'status' => 'pending', 'area_color' => '#F59E0B'],
-                        ['area_name' => 'Seguridad', 'status' => 'pending', 'area_color' => '#EF4444'],
-                    ];
-                    ?>
+            <!-- Document Card 2 -->
+            <div class="card document-card" data-status="approved" data-type="especificacion_tecnica">
+                <div class="flex items-start gap-lg">
+                    <div class="flex-shrink-0">
+                        <div class="w-16 h-20 bg-blue-100 rounded-lg flex items-center justify-center text-2xl">
+                            📄
+                        </div>
+                    </div>
                     
-                    <?php foreach ($phases as $index => $phase): ?>
-                        <div class="flex items-center gap-md p-md rounded-lg border
-                            <?= $phase['status'] === 'completed' ? 'bg-green-50 border-green-200' : 
-                                ($phase['status'] === 'in_progress' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200') ?>">
-                            
-                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm"
-                                 style="background: <?= $phase['area_color'] ?>;">
-                                <?= $index + 1 ?>
+                    <div class="flex-1">
+                        <div class="flex items-start justify-between mb-sm">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 mb-xs">
+                                    Especificacion_Tecnica.docx
+                                </h3>
+                                <p class="text-primary font-medium">PROJ-2025-002 - Portal de Estudiantes</p>
                             </div>
-                            
-                            <div class="flex-1">
-                                <h4 class="font-medium text-gray-800"><?= esc($phase['area_name']) ?></h4>
-                                <p class="text-sm text-gray-500">
-                                    <?php if ($phase['status'] === 'completed'): ?>
-                                        ✅ Completada
-                                    <?php elseif ($phase['status'] === 'in_progress'): ?>
-                                        ⚡ En progreso (tu revisión)
-                                    <?php else: ?>
-                                        ⏳ Pendiente
-                                    <?php endif; ?>
-                                </p>
+                            <span class="status-badge status-approved">Aprobado</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-4 gap-lg text-sm text-gray-600 mb-md">
+                            <div>
+                                <span class="font-medium">Tipo:</span><br>
+                                Especificación Técnica
                             </div>
-                            
-                            <?php if ($phase['status'] === 'in_progress'): ?>
-                                <span class="px-sm py-xs bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                                    Tu turno
+                            <div>
+                                <span class="font-medium">Subido por:</span><br>
+                                María González
+                            </div>
+                            <div>
+                                <span class="font-medium">Aprobado:</span><br>
+                                <?= date('d/m/Y H:i', strtotime('-1 day')) ?>
+                            </div>
+                            <div>
+                                <span class="font-medium">Tamaño:</span><br>
+                                1.8 MB
+                            </div>
+                        </div>
+                        
+                        <div class="mb-md">
+                            <div class="flex justify-between text-xs mb-xs">
+                                <span class="text-gray-600">Estado de Revisión</span>
+                                <span class="font-semibold text-green-600">100% ✅</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-sm">
+                                <button onclick="previewDocument(2)" class="btn btn-sm btn-secondary">
+                                    👁️ Vista Previa
+                                </button>
+                                <button onclick="downloadDocument(2)" class="btn btn-sm btn-outline">
+                                    📥 Descargar
+                                </button>
+                                <button onclick="shareDocument(2)" class="btn btn-sm btn-outline">
+                                    📤 Compartir
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-xs">
+                                <span class="text-sm text-green-600 font-medium">
+                                    ✅ Aprobado por: Carlos Mendoza
                                 </span>
-                            <?php endif; ?>
+                            </div>
                         </div>
-                    <?php endforeach; ?>
+                    </div>
                 </div>
-            </section>
-            
-            <!-- Documents -->
-            <section class="card">
-                <div class="flex items-center justify-between mb-lg">
-                    <h3 class="card-title mb-0">📎 Documentos del Proyecto</h3>
-                    <button onclick="App.openModal('upload-document-modal')" class="btn btn-sm btn-secondary">
-                        📤 Subir Documento
-                    </button>
-                </div>
-                
-                <?php 
-                $documents = $project['documents'] ?? [
-                    ['id' => 1, 'original_name' => 'Ficha_Formalizacion.pdf', 'document_type' => 'ficha_formalizacion', 'status' => 'approved', 'file_size' => 2048000],
-                    ['id' => 2, 'original_name' => 'Especificacion_Tecnica.docx', 'document_type' => 'especificacion_tecnica', 'status' => 'pending', 'file_size' => 1024000],
-                ];
-                ?>
-                
-                <?php if (!empty($documents)): ?>
-                    <div class="space-y-sm">
-                        <?php foreach ($documents as $doc): ?>
-                            <div class="flex items-center justify-between p-md bg-gray-50 rounded-lg border">
-                                <div class="flex items-center gap-md">
-                                    <div class="text-2xl">
-                                        <?= getDocumentIcon($doc['document_type']) ?>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-medium text-gray-800">
-                                            <?= esc($doc['original_name']) ?>
-                                        </h4>
-                                        <p class="text-sm text-gray-500">
-                                            <?= getDocumentTypeName($doc['document_type']) ?> • 
-                                            <?= formatFileSize($doc['file_size']) ?>
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-sm">
-                                    <span class="status-badge status-<?= $doc['status'] ?>">
-                                        <?= ucfirst($doc['status']) ?>
-                                    </span>
-                                    <button onclick="downloadDocument(<?= $doc['id'] ?>)" 
-                                            class="btn btn-sm btn-outline" 
-                                            data-tooltip="Descargar">
-                                        📥
-                                    </button>
-                                    <?php if ($doc['status'] === 'pending'): ?>
-                                        <button onclick="reviewDocument(<?= $doc['id'] ?>)" 
-                                                class="btn btn-sm btn-primary" 
-                                                data-tooltip="Revisar">
-                                            👁️
-                                        </button>
-                                    <?php endif; ?>
+            </div>
+
+            <!-- Document Card 3 -->
+            <div class="card document-card" data-status="rejected" data-type="diagrama_arquitectura">
+                <div class="flex items-start gap-lg">
+                    <div class="flex-shrink-0">
+                        <div class="w-16 h-20 bg-purple-100 rounded-lg flex items-center justify-center text-2xl">
+                            🏗️
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1">
+                        <div class="flex items-start justify-between mb-sm">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 mb-xs">
+                                    Diagrama_Arquitectura_v1.png
+                                </h3>
+                                <p class="text-primary font-medium">PROJ-2025-003 - API de Integración</p>
+                            </div>
+                            <span class="status-badge status-rejected">Rechazado</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-4 gap-lg text-sm text-gray-600 mb-md">
+                            <div>
+                                <span class="font-medium">Tipo:</span><br>
+                                Diagrama de Arquitectura
+                            </div>
+                            <div>
+                                <span class="font-medium">Subido por:</span><br>
+                                Luis Torres
+                            </div>
+                            <div>
+                                <span class="font-medium">Rechazado:</span><br>
+                                <?= date('d/m/Y H:i', strtotime('-3 hours')) ?>
+                            </div>
+                            <div>
+                                <span class="font-medium">Tamaño:</span><br>
+                                3.2 MB
+                            </div>
+                        </div>
+
+                        <!-- Rejection Reason -->
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-md mb-md">
+                            <div class="flex items-start gap-sm">
+                                <span class="text-red-500 text-lg">⚠️</span>
+                                <div>
+                                    <h4 class="font-semibold text-red-800 text-sm">Motivo del Rechazo:</h4>
+                                    <p class="text-red-700 text-sm">
+                                        El diagrama no incluye los componentes de seguridad requeridos. 
+                                        Favor incluir firewall, autenticación y cifrado de datos.
+                                    </p>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="text-center py-lg text-gray-500">
-                        <div class="text-2xl mb-md">📄</div>
-                        <p>No hay documentos subidos aún</p>
-                    </div>
-                <?php endif; ?>
-            </section>
-        </div>
-        
-        <!-- Sidebar - 1 column -->
-        <div class="space-y-xl">
-            
-            <!-- Decision Panel -->
-            <section class="card">
-                <h3 class="card-title">⚖️ Panel de Decisión</h3>
-                
-                <form id="decision-form" class="space-y-lg">
-                    <input type="hidden" name="project_id" value="<?= $project['id'] ?>">
-                    
-                    <div class="form-group">
-                        <label class="form-label">Decisión:</label>
-                        <div class="space-y-sm">
-                            <label class="flex items-center gap-sm">
-                                <input type="radio" name="decision" value="approve" class="form-radio">
-                                <span class="text-green-600 font-medium">✅ Aprobar</span>
-                            </label>
-                            <label class="flex items-center gap-sm">
-                                <input type="radio" name="decision" value="reject" class="form-radio">
-                                <span class="text-red-600 font-medium">❌ Rechazar</span>
-                            </label>
-                            <label class="flex items-center gap-sm">
-                                <input type="radio" name="decision" value="request_changes" class="form-radio">
-                                <span class="text-yellow-600 font-medium">🔄 Solicitar Cambios</span>
-                            </label>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-sm">
+                                <button onclick="previewDocument(3)" class="btn btn-sm btn-secondary">
+                                    👁️ Vista Previa
+                                </button>
+                                <button onclick="downloadDocument(3)" class="btn btn-sm btn-outline">
+                                    📥 Descargar
+                                </button>
+                                <button onclick="sendFeedback(3)" class="btn btn-sm btn-warning">
+                                    💬 Enviar Feedback
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-xs">
+                                <button onclick="requestRevision(3)" class="btn btn-sm btn-secondary">
+                                    🔄 Solicitar Revisión
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Comentarios:</label>
-                        <textarea name="comments" class="form-textarea" rows="4" 
-                                  placeholder="Escribe tus comentarios sobre el proyecto..."></textarea>
-                    </div>
-                    
-                    <div class="form-group" id="rejection-reason-group" style="display: none;">
-                        <label class="form-label">Motivo del Rechazo:</label>
-                        <select name="rejection_reason" class="form-select">
-                            <option value="">Selecciona un motivo</option>
-                            <option value="incomplete_documentation">Documentación incompleta</option>
-                            <option value="technical_issues">Problemas técnicos</option>
-                            <option value="security_concerns">Preocupaciones de seguridad</option>
-                            <option value="budget_constraints">Restricciones presupuestarias</option>
-                            <option value="other">Otro motivo</option>
-                        </select>
-                    </div>
-                    
-                    <div class="space-y-sm">
-                        <button type="submit" class="btn btn-primary w-full">
-                            💾 Guardar Decisión
-                        </button>
-                        <button type="button" onclick="saveDraft()" class="btn btn-secondary w-full">
-                            📝 Guardar Borrador
-                        </button>
-                    </div>
-                </form>
-            </section>
-            
-            <!-- Project Info -->
-            <section class="card">
-                <h3 class="card-title">ℹ️ Información Adicional</h3>
-                
-                <div class="space-y-md text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Tiempo estimado:</span>
-                        <span class="font-medium">5-7 días</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Complejidad:</span>
-                        <span class="font-medium">Media</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Área actual:</span>
-                        <span class="font-medium">Arquitectura</span>
-                    </div>
-                    <?php if (isset($project['estimated_completion'])): ?>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Fecha objetivo:</span>
-                        <span class="font-medium">
-                            <?= date('d/m/Y', strtotime($project['estimated_completion'])) ?>
-                        </span>
-                    </div>
-                    <?php endif; ?>
                 </div>
-                
-                <div class="mt-lg pt-lg border-t border-gray-200">
-                    <h4 class="font-medium text-gray-800 mb-sm">Acciones Rápidas:</h4>
-                    <div class="space-y-xs">
-                        <button onclick="contactRequester()" class="btn btn-sm btn-outline w-full">
-                            📧 Contactar Solicitante
-                        </button>
-                        <button onclick="assignToReviewer()" class="btn btn-sm btn-outline w-full">
-                            👥 Asignar a Revisor
-                        </button>
-                        <button onclick="requestMoreInfo()" class="btn btn-sm btn-outline w-full">
-                            ❓ Solicitar Más Info
-                        </button>
-                    </div>
-                </div>
-            </section>
-            
-            <!-- Review History -->
-            <section class="card">
-                <h3 class="card-title">📝 Historial de Revisiones</h3>
-                
-                <div class="space-y-sm text-sm">
-                    <div class="p-sm bg-green-50 rounded border-l-4 border-green-400">
-                        <div class="font-medium text-green-800">✅ Aprobado - Formalización</div>
-                        <div class="text-green-600">Carlos Mendoza • hace 2 días</div>
-                        <div class="text-green-700 mt-xs">"Documentación completa y correcta"</div>
-                    </div>
-                    
-                    <div class="p-sm bg-blue-50 rounded border-l-4 border-blue-400">
-                        <div class="font-medium text-blue-800">🔄 En Revisión - Arquitectura</div>
-                        <div class="text-blue-600">Ahora • Esperando tu decisión</div>
-                    </div>
-                </div>
-            </section>
+            </div>
+
+        </div>
+
+        <!-- Table View (Initially Hidden) -->
+        <div id="table-view" class="card" style="display: none;">
+            <div class="table-container">
+                <table class="table data-table">
+                    <thead>
+                        <tr>
+                            <th>Documento</th>
+                            <th>Proyecto</th>
+                            <th>Tipo</th>
+                            <th>Estado</th>
+                            <th>Subido por</th>
+                            <th>Fecha</th>
+                            <th>Tamaño</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div class="flex items-center gap-sm">
+                                    <span class="text-lg">📋</span>
+                                    <span class="font-medium">Ficha_Formalizacion_v2.pdf</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <div class="font-medium text-primary">PROJ-2025-001</div>
+                                    <div class="text-sm text-gray-500">Sistema de Gestión Académica</div>
+                                </div>
+                            </td>
+                            <td><span class="text-sm">Ficha de Formalización</span></td>
+                            <td><span class="status-badge status-pending">Pendiente</span></td>
+                            <td>Juan Pérez</td>
+                            <td><?= date('d/m/Y H:i', strtotime('-2 hours')) ?></td>
+                            <td>2.4 MB</td>
+                            <td>
+                                <div class="flex items-center gap-xs">
+                                    <button class="btn btn-sm btn-secondary" data-tooltip="Vista previa">👁️</button>
+                                    <button class="btn btn-sm btn-success" data-tooltip="Aprobar">✅</button>
+                                    <button class="btn btn-sm btn-error" data-tooltip="Rechazar">❌</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- More rows would be dynamically populated -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bulk Actions -->
+    <section class="card">
+        <h3 class="text-lg font-semibold mb-md">🎯 Acciones Masivas</h3>
+        <div class="flex items-center gap-md">
+            <button onclick="selectAllDocuments()" class="btn btn-secondary">
+                ☑️ Seleccionar Todos
+            </button>
+            <button onclick="bulkApprove()" class="btn btn-success">
+                ✅ Aprobar Seleccionados
+            </button>
+            <button onclick="bulkReject()" class="btn btn-error">
+                ❌ Rechazar Seleccionados
+            </button>
+            <button onclick="bulkDownload()" class="btn btn-outline">
+                📥 Descargar Seleccionados
+            </button>
+            <button onclick="generateReport()" class="btn btn-secondary">
+                📊 Generar Reporte
+            </button>
+        </div>
+    </section>
+</div>
+
+<!-- Document Preview Modal -->
+<div id="document-preview-modal" class="modal" style="display: none;">
+    <div class="modal-overlay" onclick="App.closeModal(document.getElementById('document-preview-modal'))"></div>
+    <div class="modal-container" style="max-width: 90vw; max-height: 90vh;">
+        <div class="modal-header">
+            <h3 class="modal-title">Vista Previa del Documento</h3>
+            <button onclick="App.closeModal(document.getElementById('document-preview-modal'))" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+            <iframe id="document-iframe" src="" style="width: 100%; height: 70vh; border: none;"></iframe>
+        </div>
+        <div class="modal-footer">
+            <button onclick="App.closeModal(document.getElementById('document-preview-modal'))" class="btn btn-secondary">Cerrar</button>
+            <button onclick="downloadCurrentDocument()" class="btn btn-primary">📥 Descargar</button>
         </div>
     </div>
 </div>
 
-<!-- Modal de Decisión Rápida -->
-<div id="quick-decision-modal" class="modal" style="display: none;">
-    <div class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>⚡ Decisión Rápida</h3>
-                <button onclick="App.closeModal('quick-decision-modal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="space-y-md">
-                    <button onclick="quickDecision('approve')" class="btn btn-success btn-lg w-full">
-                        ✅ Aprobar Proyecto
-                    </button>
-                    <button onclick="quickDecision('reject')" class="btn btn-error btn-lg w-full">
-                        ❌ Rechazar Proyecto
-                    </button>
-                    <button onclick="quickDecision('request_changes')" class="btn btn-warning btn-lg w-full">
-                        🔄 Solicitar Cambios
-                    </button>
+<!-- Rejection Modal -->
+<div id="rejection-modal" class="modal" style="display: none;">
+    <div class="modal-overlay" onclick="App.closeModal(document.getElementById('rejection-modal'))"></div>
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3 class="modal-title">Rechazar Documento</h3>
+            <button onclick="App.closeModal(document.getElementById('rejection-modal'))" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="rejection-form">
+                <div class="form-group">
+                    <label class="form-label">Motivo del Rechazo *</label>
+                    <select class="form-select" name="rejection_reason" required>
+                        <option value="">Seleccionar motivo...</option>
+                        <option value="incomplete">Documentación incompleta</option>
+                        <option value="format">Formato no válido</option>
+                        <option value="content">Contenido insuficiente</option>
+                        <option value="requirements">No cumple con los requisitos</option>
+                        <option value="security">Problemas de seguridad</option>
+                        <option value="other">Otro motivo</option>
+                    </select>
                 </div>
-            </div>
+                <div class="form-group">
+                    <label class="form-label">Comentarios Adicionales</label>
+                    <textarea class="form-textarea" name="comments" rows="4" 
+                              placeholder="Describe en detalle los problemas encontrados y las acciones requeridas..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="notify_user" checked>
+                        Notificar al usuario por email
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button onclick="App.closeModal(document.getElementById('rejection-modal'))" class="btn btn-secondary">Cancelar</button>
+            <button onclick="submitRejection()" class="btn btn-error">❌ Confirmar Rechazo</button>
         </div>
     </div>
 </div>
-
-<?php
-// Funciones auxiliares
-function getDocumentIcon($type) {
-    $icons = [
-        'ficha_formalizacion' => '📋',
-        'especificacion_tecnica' => '📄',
-        'diagrama_arquitectura' => '🏗️',
-        'manual_usuario' => '📖',
-        'plan_pruebas' => '🧪',
-        'certificado_seguridad' => '🔒'
-    ];
-    return $icons[$type] ?? '📄';
-}
-
-function getDocumentTypeName($type) {
-    $names = [
-        'ficha_formalizacion' => 'Ficha de Formalización',
-        'especificacion_tecnica' => 'Especificación Técnica',
-        'diagrama_arquitectura' => 'Diagrama de Arquitectura',
-        'manual_usuario' => 'Manual de Usuario',
-        'plan_pruebas' => 'Plan de Pruebas',
-        'certificado_seguridad' => 'Certificado de Seguridad'
-    ];
-    return $names[$type] ?? 'Documento';
-}
-
-function formatFileSize($bytes) {
-    $units = ['B', 'KB', 'MB', 'GB'];
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    $bytes /= pow(1024, $pow);
-    return round($bytes, 2) . ' ' . $units[$pow];
-}
-?>
-
-<style>
-.priority-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.priority-low { background: var(--gray-100); color: var(--gray-700); }
-.priority-medium { background: var(--primary-100); color: var(--primary-700); }
-.priority-high { background: var(--warning-100); color: var(--warning-700); }
-.priority-critical { background: var(--error-100); color: var(--error-700); }
-
-.status-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.status-pending { background: var(--warning-100); color: var(--warning-700); }
-.status-approved { background: var(--success-100); color: var(--success-700); }
-.status-rejected { background: var(--error-100); color: var(--error-700); }
-
-.form-radio {
-    width: 1rem;
-    height: 1rem;
-    color: var(--primary-500);
-}
-
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.modal-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.modal-content {
-    background: white;
-    border-radius: var(--radius-xl);
-    padding: var(--spacing-xl);
-    max-width: 500px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-lg);
-}
-
-.modal-header button {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-</style>
 
 <?php $this->endSection(); ?>
 
 <?php $this->section('scripts'); ?>
-// JavaScript para revisión de proyecto
-console.log('Admin Review Project cargado');
+// JavaScript para gestión de documentos
+console.log('Vista de gestión de documentos cargada');
 
-// Manejar cambios en decisión
-document.querySelectorAll('input[name="decision"]').forEach(radio => {
-    radio.addEventListener('change', function() {
-        const rejectionGroup = document.getElementById('rejection-reason-group');
-        if (this.value === 'reject') {
-            rejectionGroup.style.display = 'block';
-            rejectionGroup.querySelector('select').setAttribute('required', '');
-        } else {
-            rejectionGroup.style.display = 'none';
-            rejectionGroup.querySelector('select').removeAttribute('required');
-        }
-    });
-});
+let currentView = 'grid';
+let selectedDocuments = [];
 
-// Enviar formulario de decisión
-document.getElementById('decision-form').addEventListener('submit', function(e) {
-    e.preventDefault();
+// Toggle between grid and table view
+function toggleView() {
+    const gridView = document.getElementById('grid-view');
+    const tableView = document.getElementById('table-view');
+    const toggleBtn = document.getElementById('view-toggle');
     
-    const formData = new FormData(this);
-    const decision = formData.get('decision');
-    
-    if (!decision) {
-        App.showNotification('Selecciona una decisión', 'warning');
-        return;
+    if (currentView === 'grid') {
+        gridView.style.display = 'none';
+        tableView.style.display = 'block';
+        toggleBtn.innerHTML = '📊 Vista Tarjetas';
+        currentView = 'table';
+    } else {
+        gridView.style.display = 'block';
+        tableView.style.display = 'none';
+        toggleBtn.innerHTML = '📋 Vista Lista';
+        currentView = 'grid';
     }
-    
-    if (decision === 'reject' && !formData.get('rejection_reason')) {
-        App.showNotification('Selecciona un motivo de rechazo', 'warning');
-        return;
-    }
-    
-    const submitBtn = this.querySelector('button[type="submit"]');
-    App.setLoading(submitBtn, true);
-    
-    fetch(`/admin/projects/${formData.get('project_id')}/decision`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            App.showNotification('Decisión guardada exitosamente', 'success');
-            setTimeout(() => {
-                window.location.href = '/admin/projects/pending';
-            }, 2000);
-        } else {
-            App.showNotification(data.message || 'Error al guardar decisión', 'error');
-        }
-    })
-    .catch(error => {
-        App.showNotification('Error de conexión', 'error');
-    })
-    .finally(() => {
-        App.setLoading(submitBtn, false);
-    });
-});
+}
 
-// Decisiones rápidas
-function quickDecision(decision) {
-    let message = '';
-    switch(decision) {
-        case 'approve':
-            message = '¿Aprobar este proyecto?';
-            break;
-        case 'reject':
-            message = '¿Rechazar este proyecto?';
-            break;
-        case 'request_changes':
-            message = '¿Solicitar cambios en este proyecto?';
-            break;
-    }
+// Document actions
+function previewDocument(documentId) {
+    const modal = document.getElementById('document-preview-modal');
+    const iframe = document.getElementById('document-iframe');
     
-    if (confirm(message)) {
-        const projectId = document.querySelector('input[name="project_id"]').value;
+    // In a real implementation, this would load the actual document
+    iframe.src = `/admin/documents/${documentId}/preview`;
+    
+    modal.style.display = 'flex';
+}
+
+function downloadDocument(documentId) {
+    console.log(`Downloading document ${documentId}`);
+    window.open(`/admin/documents/${documentId}/download`, '_blank');
+}
+
+function shareDocument(documentId) {
+    if (navigator.share) {
+        navigator.share({
+            title: 'Documento del Sistema Multi-Área UC',
+            url: window.location.origin + `/documents/${documentId}`
+        });
+    } else {
+        navigator.clipboard.writeText(window.location.origin + `/documents/${documentId}`);
+        App.showNotification('Enlace copiado al portapapeles', 'success');
+    }
+}
+
+function approveDocument(documentId) {
+    if (confirm('¿Estás seguro de aprobar este documento?')) {
+        App.setLoading(event.target, true);
         
-        fetch(`/admin/projects/${projectId}/quick-decision`, {
+        fetch(`/admin/documents/${documentId}/approve`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify({
-                decision: decision,
-                comments: `Decisión rápida: ${decision}`
+                approved_by: <?= $user['id'] ?>,
+                comments: 'Documento aprobado'
             })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                App.showNotification('Decisión procesada', 'success');
-                App.closeModal('quick-decision-modal');
-                setTimeout(() => {
-                    window.location.href = '/admin/projects/pending';
-                }, 1500);
+                App.showNotification('Documento aprobado exitosamente', 'success');
+                location.reload();
             } else {
-                App.showNotification(data.message || 'Error al procesar decisión', 'error');
+                App.showNotification('Error al aprobar documento', 'error');
             }
         })
         .catch(error => {
             App.showNotification('Error de conexión', 'error');
+        })
+        .finally(() => {
+            App.setLoading(event.target, false);
         });
     }
 }
 
-// Guardar borrador
-function saveDraft() {
-    const formData = new FormData(document.getElementById('decision-form'));
+function rejectDocument(documentId) {
+    // Store document ID for the modal
+    document.getElementById('rejection-form').dataset.documentId = documentId;
+    document.getElementById('rejection-modal').style.display = 'flex';
+}
+
+function submitRejection() {
+    const form = document.getElementById('rejection-form');
+    const documentId = form.dataset.documentId;
+    const formData = new FormData(form);
     
-    fetch(`/admin/projects/${formData.get('project_id')}/save-draft`, {
+    App.setLoading(event.target, true);
+    
+    fetch(`/admin/documents/${documentId}/reject`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -608,58 +560,210 @@ function saveDraft() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            App.showNotification('Borrador guardado', 'info');
+            App.showNotification('Documento rechazado', 'success');
+            App.closeModal(document.getElementById('rejection-modal'));
+            location.reload();
         } else {
-            App.showNotification('Error al guardar borrador', 'error');
+            App.showNotification('Error al rechazar documento', 'error');
+        }
+    })
+    .catch(error => {
+        App.showNotification('Error de conexión', 'error');
+    })
+    .finally(() => {
+        App.setLoading(event.target, false);
+    });
+}
+
+// Filtering
+const searchInput = document.getElementById('search-documents');
+const statusFilter = document.getElementById('filter-status');
+const typeFilter = document.getElementById('filter-type');
+
+function filterDocuments() {
+    const searchTerm = searchInput.value.toLowerCase();
+    const statusValue = statusFilter.value;
+    const typeValue = typeFilter.value;
+    
+    const documentCards = document.querySelectorAll('.document-card');
+    
+    documentCards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        const status = card.dataset.status;
+        const type = card.dataset.type;
+        
+        const matchesSearch = !searchTerm || text.includes(searchTerm);
+        const matchesStatus = !statusValue || status === statusValue;
+        const matchesType = !typeValue || type === typeValue;
+        
+        if (matchesSearch && matchesStatus && matchesType) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
         }
     });
 }
 
-// Acciones adicionales
-function downloadDocument(docId) {
-    window.open(`/admin/documents/${docId}/download`, '_blank');
+searchInput.addEventListener('input', App.utils.debounce(filterDocuments, 300));
+statusFilter.addEventListener('change', filterDocuments);
+typeFilter.addEventListener('change', filterDocuments);
+
+// Bulk actions
+function selectAllDocuments() {
+    const checkboxes = document.querySelectorAll('.document-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+    });
+    
+    updateSelectedDocuments();
 }
 
-function reviewDocument(docId) {
-    window.location.href = `/admin/documents/${docId}/review`;
-}
-
-function contactRequester() {
-    const email = '<?= esc($project['contact_email'] ?? '') ?>';
-    const subject = `Consulta sobre proyecto ${<?= json_encode($project['code']) ?>}`;
-    window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}`);
-}
-
-function assignToReviewer() {
-    App.showNotification('Función de asignación en desarrollo', 'info');
-}
-
-function requestMoreInfo() {
-    App.showNotification('Función de solicitud de información en desarrollo', 'info');
-}
-
-// Atajos de teclado
-document.addEventListener('keydown', function(e) {
-    if (e.ctrlKey || e.metaKey) {
-        switch(e.key) {
-            case 'a': // Ctrl+A = Aprobar
-                e.preventDefault();
-                document.querySelector('input[value="approve"]').checked = true;
-                break;
-            case 'r': // Ctrl+R = Rechazar
-                e.preventDefault();
-                document.querySelector('input[value="reject"]').checked = true;
-                break;
-            case 's': // Ctrl+S = Guardar
-                e.preventDefault();
-                document.getElementById('decision-form').dispatchEvent(new Event('submit'));
-                break;
-        }
+function updateSelectedDocuments() {
+    selectedDocuments = Array.from(document.querySelectorAll('.document-checkbox:checked'))
+                            .map(cb => cb.value);
+    
+    // Update UI to show selected count
+    const bulkActions = document.querySelector('.bulk-actions');
+    if (selectedDocuments.length > 0) {
+        bulkActions.style.display = 'block';
+    } else {
+        bulkActions.style.display = 'none';
     }
-});
+}
 
-console.log('Atajos disponibles:');
-console.log('Ctrl+A: Seleccionar aprobar');
-console.log('Ctrl+R: Seleccionar rechazar');
-console.log('Ctrl+S: Guardar decisión');
+function exportDocuments() {
+    App.setLoading(event.target, true);
+    
+    fetch('/admin/documents/export', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            filters: {
+                status: statusFilter.value,
+                type: typeFilter.value,
+                search: searchInput.value
+            }
+        })
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `documentos_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        
+        App.showNotification('Reporte exportado exitosamente', 'success');
+    })
+    .catch(error => {
+        App.showNotification('Error al exportar', 'error');
+    })
+    .finally(() => {
+        App.setLoading(event.target, false);
+    });
+}
+
+// Add status badge styles
+const style = document.createElement('style');
+style.textContent = `
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-pending {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+    
+    .status-approved {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-rejected {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .modal-container {
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        position: relative;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6b7280;
+    }
+    
+    .modal-body {
+        padding: 1.5rem;
+    }
+    
+    .modal-footer {
+        padding: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+    }
+`;
+document.head.appendChild(style);
+
+console.log('Gestión de documentos inicializada correctamente');
 <?php $this->endSection(); ?>
